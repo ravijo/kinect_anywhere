@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!--
+kinect_anywhere.launch
+Author: Ravi Joshi
+Date: 2018/01/16
+-->
+<launch>
+  <arg name="body" default="false"/>
+  <arg name="color" default="false"/>
+  <arg name="pointcloud" default="false"/>
+
+  <arg name="host" default="192.168.1.20"/>
+  <arg name="recv_timeout" default="1000"/>
+  <arg name="ns_prefix" default="/kinect_anywhere"/>
+  <arg name="kinect_frame" default="kinect2_link"/>
+
+  <group ns="$(arg ns_prefix)">
+    <group if="$(arg body)">
+      <node name="body_frame" pkg="kinect_anywhere" type="body_frame" output="screen">
+        <param name="host" value="$(arg host)" />
+        <param name="recv_timeout" value="$(arg recv_timeout)" />
+        <param name="kinect_frame_id" value="$(arg kinect_frame)" />
+      </node>
+    </group>
+
+    <group if="$(arg color)">
+        <node name="color_frame" pkg="kinect_anywhere" type="color_frame" output="screen">
+          <param name="host" value="$(arg host)" />
+          <param name="recv_timeout" value="$(arg recv_timeout)" />
+          <param name="kinect_frame_id" value="$(arg kinect_frame)" />
+        </node>
+    </group>
+
+    <group if="$(arg pointcloud)">
+      <node name="point_cloud" pkg="kinect_anywhere" type="point_cloud" output="screen">
+          <param name="host" value="$(arg host)" />
+          <param name="recv_timeout" value="$(arg recv_timeout)" />
+          <param name="kinect_frame_id" value="$(arg kinect_frame)" />
+      </node>
+    </group>
+  </group>
+</launch>
