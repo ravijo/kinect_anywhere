@@ -113,20 +113,10 @@ namespace Kinect_Anywhere
                     return;
                 }
 
-                // Copy raw data for composing Point Cloud
-                depthFrame.CopyFrameDataToIntPtr(depthFrameData, DEPTH_FRAME_BYTES);
-                coordinateMapper.MapDepthFrameToCameraSpaceUsingIntPtr(depthFrameData, DEPTH_FRAME_BYTES, camerSpacePoints, CAMERA_SPACE_BYTES);
-                coordinateMapper.MapDepthFrameToColorSpaceUsingIntPtr(depthFrameData, DEPTH_FRAME_BYTES, colorSpacePoints, COLOR_SPACE_BYTES);
-
-                // Copy color data (using RGBA format)
+                // Copy color data (using Bgra format)
                 colorFrame.CopyConvertedFrameDataToIntPtr(colorPixels, COLOR_PIXEL_BYTES, ColorImageFormat.Bgra);
 
-                // Copy data for Body tracking
-                bodyArray = new Body[bodyFrame.BodyCount];
-                bodyFrame.GetAndRefreshBodyData(bodyArray);
-
-
-                ProcessRawData();
+                ProcessFrames(ref depthFrame, ref bodyFrame);
             }
             finally
             {
@@ -147,17 +137,21 @@ namespace Kinect_Anywhere
             }
         }
 
-        unsafe public void ProcessRawData()
+        unsafe public void ProcessFrames(ref DepthFrame depthFrame, ref BodyFrame bodyFrame)
         {
             if (PointCloudData.Checked)
             {
+                depthFrame.CopyFrameDataToIntPtr(depthFrameData, DEPTH_FRAME_BYTES);
+                coordinateMapper.MapDepthFrameToCameraSpaceUsingIntPtr(depthFrameData, DEPTH_FRAME_BYTES, camerSpacePoints, CAMERA_SPACE_BYTES);
+                coordinateMapper.MapDepthFrameToColorSpaceUsingIntPtr(depthFrameData, DEPTH_FRAME_BYTES, colorSpacePoints, COLOR_SPACE_BYTES);
+
                 int validPointCount = 0;
 
                 // Remove old points
                 pointCloudData.Clear();
 
                 //At this point, we are just reserving 4 bytes for storing 'validPointCount' and we are going to modify it later
-                pointCloudData.AddRange(new byte[4] { 0, 0, 0, 0 });
+                AddArrayToList(ref pointCloudData, new byte[4] { 0, 0, 0, 0 });
 
                 var colorSpacePoint = (ColorSpacePoint*)colorSpacePoints;
                 var camerSpacePoint = (CameraSpacePoint*)camerSpacePoints;
@@ -185,12 +179,12 @@ namespace Kinect_Anywhere
                     byte red = colorPixel[pixelsBaseIndex + 2];
                     byte alpha = colorPixel[pixelsBaseIndex + 3];
 
-                    pointCloudData.AddRange(BitConverter.GetBytes(camerSpacePoint[index].X)); //add 4 bytes for float x
-                    pointCloudData.AddRange(BitConverter.GetBytes(camerSpacePoint[index].Y)); //add 4 bytes for float y
-                    pointCloudData.AddRange(BitConverter.GetBytes(camerSpacePoint[index].Z)); //add 4 bytes for float z
+                    AddArrayToList(ref pointCloudData, BitConverter.GetBytes(camerSpacePoint[index].X)); //add 4 bytes for float x
+                    AddArrayToList(ref pointCloudData, BitConverter.GetBytes(camerSpacePoint[index].Y)); //add 4 bytes for float y
+                    AddArrayToList(ref pointCloudData, BitConverter.GetBytes(camerSpacePoint[index].Z)); //add 4 bytes for float z
 
                     uint bgra = (uint)((blue << 24) | (green << 16) | (red << 8) | alpha);
-                    pointCloudData.AddRange(BitConverter.GetBytes(bgra)); //add 4 bytes for unsigned int
+                    AddArrayToList(ref pointCloudData, BitConverter.GetBytes(bgra)); //add 4 bytes for unsigned int
 
                     //Added 16 bytes in one iteration
                     validPointCount++;
@@ -205,17 +199,20 @@ namespace Kinect_Anywhere
             if (ColorData.Checked)
             {
                 Marshal.Copy(colorPixels, colorFrameData, 8, (int)COLOR_PIXEL_BYTES);
-                //Console.WriteLine("C: "+colorFrameData.Length);
                 colorFramePublisher.Send(new ZFrame(colorFrameData));
             }
 
             if (BodyData.Checked)
             {
+                // Copy data for Body tracking
+                bodyArray = new Body[bodyFrame.BodyCount];
+                bodyFrame.GetAndRefreshBodyData(bodyArray);
+
                 // Remove old bodies
                 bodyFrameData.Clear();
 
                 //At this point, we are just reserving 4 bytes for storing 'bodyCount' and we are going to modify it later
-                bodyFrameData.AddRange(new byte[4] { 0, 0, 0, 0 });
+                AddArrayToList(ref bodyFrameData, new byte[4] { 0, 0, 0, 0 });
 
                 int bodyCount = 0;
                 foreach (Body body in bodyArray)
@@ -225,17 +222,17 @@ namespace Kinect_Anywhere
                         continue;
                     }
 
-                    bodyFrameData.AddRange(BitConverter.GetBytes(body.TrackingId));//add 8 bytes for ulong TrackingId
-                    bodyFrameData.AddRange(BitConverter.GetBytes(ALL_JOINTS.Length));//add 4 bytes for int TrackingId
+                    AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(body.TrackingId));//add 8 bytes for ulong TrackingId
+                    AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(ALL_JOINTS.Length));//add 4 bytes for int TrackingId
 
                     foreach (JointType jointType in ALL_JOINTS)
                     {
                         var joint = body.Joints[jointType];
-                        bodyFrameData.AddRange(BitConverter.GetBytes((int)joint.TrackingState));//add 4 bytes for int TrackingState
-                        bodyFrameData.AddRange(BitConverter.GetBytes((int)joint.JointType));//add 4 bytes for int JointType
-                        bodyFrameData.AddRange(BitConverter.GetBytes(joint.Position.X));//add 4 bytes for float X
-                        bodyFrameData.AddRange(BitConverter.GetBytes(joint.Position.Y));//add 4 bytes for float Y
-                        bodyFrameData.AddRange(BitConverter.GetBytes(joint.Position.Z));//add 4 bytes for float Z
+                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes((int)joint.TrackingState));//add 4 bytes for int TrackingState
+                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes((int)joint.JointType));//add 4 bytes for int JointType
+                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.X));//add 4 bytes for float X
+                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.Y));//add 4 bytes for float Y
+                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.Z));//add 4 bytes for float Z
                     }
                     bodyCount++;
                 }
@@ -247,6 +244,13 @@ namespace Kinect_Anywhere
             }
         }
 
+        private void AddArrayToList(ref List<byte> destination, byte[] source)
+        {
+            for (int i = 0; i < source.Length; i++)
+            {
+                destination.Add(source[i]);
+            }
+        }
 
         private void UpdateList(byte[] source, ref List<byte> destination)
         {
