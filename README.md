@@ -19,7 +19,7 @@ This is a ROS Package which gets the data from Windows application. The Linux PC
 
 ## Installation
 1. **Windows** 
-     1. *Using pre-built binary:* The easiest way to run this windows application is to download the pre-built binary from [release page](https://github.com/ravijo/kinect_anywhere/releases). The URL of current version i.e., v2 is [here](https://github.com/ravijo/kinect_anywhere/releases/download/2/Kinect.Anywhere.Windows.v2.zip).
+     1. *Using pre-built binary:* The easiest way to run this windows application is to download the pre-built binary from [release page](https://github.com/ravijo/kinect_anywhere/releases). The URL of current version i.e., v3 is [here](https://github.com/ravijo/kinect_anywhere/releases/download/3/Kinect.Anywhere.Windows.v3.zip).
      1. *Compile source code:* Incase if the above doesn't work, please compile the source code. You need to have Visual Studio Community 2017, which can be downloaded from [here](https://www.visualstudio.com/downloads/).
 1. **Linux** 
      1. *Compile source code:* The linux application is a ROS package. Hence you need to have ROS installed with a valid ROS workspace. Download the [linux](Linux) application and place it inside ROS workspace source folder i.e., `src`. Now, invoke catkin tool inside ros workspace i.e., `catkin_make`
