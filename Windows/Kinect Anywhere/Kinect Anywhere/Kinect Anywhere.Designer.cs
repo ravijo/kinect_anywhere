@@ -37,9 +37,9 @@
             this.bodyDataLabel = new System.Windows.Forms.Label();
             this.pointCloudDataLabel = new System.Windows.Forms.Label();
             this.valueLabel = new System.Windows.Forms.Label();
-            this.ColorData = new System.Windows.Forms.CheckBox();
-            this.BodyData = new System.Windows.Forms.CheckBox();
-            this.PointCloudData = new System.Windows.Forms.CheckBox();
+            this.ColorDataCheckBox = new System.Windows.Forms.CheckBox();
+            this.BodyDataCheckBox = new System.Windows.Forms.CheckBox();
+            this.PointCloudDataCheckBox = new System.Windows.Forms.CheckBox();
             this.label1 = new System.Windows.Forms.Label();
             this.startButton = new System.Windows.Forms.Button();
             this.trayIcon = new System.Windows.Forms.NotifyIcon(this.components);
@@ -73,9 +73,9 @@
             this.tableLayoutPanel1.Controls.Add(this.bodyDataLabel, 0, 2);
             this.tableLayoutPanel1.Controls.Add(this.pointCloudDataLabel, 0, 3);
             this.tableLayoutPanel1.Controls.Add(this.valueLabel, 1, 0);
-            this.tableLayoutPanel1.Controls.Add(this.ColorData, 1, 1);
-            this.tableLayoutPanel1.Controls.Add(this.BodyData, 1, 2);
-            this.tableLayoutPanel1.Controls.Add(this.PointCloudData, 1, 3);
+            this.tableLayoutPanel1.Controls.Add(this.ColorDataCheckBox, 1, 1);
+            this.tableLayoutPanel1.Controls.Add(this.BodyDataCheckBox, 1, 2);
+            this.tableLayoutPanel1.Controls.Add(this.PointCloudDataCheckBox, 1, 3);
             this.tableLayoutPanel1.Location = new System.Drawing.Point(3, 10);
             this.tableLayoutPanel1.Margin = new System.Windows.Forms.Padding(3, 10, 3, 3);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
@@ -136,36 +136,36 @@
             // 
             // ColorData
             // 
-            this.ColorData.AutoSize = true;
-            this.ColorData.Location = new System.Drawing.Point(144, 37);
-            this.ColorData.Name = "ColorData";
-            this.ColorData.Size = new System.Drawing.Size(80, 17);
-            this.ColorData.TabIndex = 5;
-            this.ColorData.Text = "checkBox1";
-            this.ColorData.UseVisualStyleBackColor = true;
-            this.ColorData.CheckedChanged += new System.EventHandler(this.ColorData_CheckedChanged);
+            this.ColorDataCheckBox.AutoSize = true;
+            this.ColorDataCheckBox.Location = new System.Drawing.Point(144, 37);
+            this.ColorDataCheckBox.Name = "ColorData";
+            this.ColorDataCheckBox.Size = new System.Drawing.Size(80, 17);
+            this.ColorDataCheckBox.TabIndex = 5;
+            this.ColorDataCheckBox.Text = "checkBox1";
+            this.ColorDataCheckBox.UseVisualStyleBackColor = true;
+            this.ColorDataCheckBox.CheckedChanged += new System.EventHandler(this.ColorData_CheckedChanged);
             // 
             // BodyData
             // 
-            this.BodyData.AutoSize = true;
-            this.BodyData.Location = new System.Drawing.Point(144, 70);
-            this.BodyData.Name = "BodyData";
-            this.BodyData.Size = new System.Drawing.Size(80, 17);
-            this.BodyData.TabIndex = 6;
-            this.BodyData.Text = "checkBox2";
-            this.BodyData.UseVisualStyleBackColor = true;
-            this.BodyData.CheckedChanged += new System.EventHandler(this.BodyData_CheckedChanged);
+            this.BodyDataCheckBox.AutoSize = true;
+            this.BodyDataCheckBox.Location = new System.Drawing.Point(144, 70);
+            this.BodyDataCheckBox.Name = "BodyData";
+            this.BodyDataCheckBox.Size = new System.Drawing.Size(80, 17);
+            this.BodyDataCheckBox.TabIndex = 6;
+            this.BodyDataCheckBox.Text = "checkBox2";
+            this.BodyDataCheckBox.UseVisualStyleBackColor = true;
+            this.BodyDataCheckBox.CheckedChanged += new System.EventHandler(this.BodyData_CheckedChanged);
             // 
             // PointCloudData
             // 
-            this.PointCloudData.AutoSize = true;
-            this.PointCloudData.Location = new System.Drawing.Point(144, 103);
-            this.PointCloudData.Name = "PointCloudData";
-            this.PointCloudData.Size = new System.Drawing.Size(80, 17);
-            this.PointCloudData.TabIndex = 7;
-            this.PointCloudData.Text = "checkBox3";
-            this.PointCloudData.UseVisualStyleBackColor = true;
-            this.PointCloudData.CheckedChanged += new System.EventHandler(this.PointCloudData_CheckedChanged);
+            this.PointCloudDataCheckBox.AutoSize = true;
+            this.PointCloudDataCheckBox.Location = new System.Drawing.Point(144, 103);
+            this.PointCloudDataCheckBox.Name = "PointCloudData";
+            this.PointCloudDataCheckBox.Size = new System.Drawing.Size(80, 17);
+            this.PointCloudDataCheckBox.TabIndex = 7;
+            this.PointCloudDataCheckBox.Text = "checkBox3";
+            this.PointCloudDataCheckBox.UseVisualStyleBackColor = true;
+            this.PointCloudDataCheckBox.CheckedChanged += new System.EventHandler(this.PointCloudData_CheckedChanged);
             // 
             // label1
             // 
@@ -243,9 +243,9 @@
         private System.Windows.Forms.Label bodyDataLabel;
         private System.Windows.Forms.Label pointCloudDataLabel;
         private System.Windows.Forms.Label valueLabel;
-        private System.Windows.Forms.CheckBox ColorData;
-        private System.Windows.Forms.CheckBox BodyData;
-        private System.Windows.Forms.CheckBox PointCloudData;
+        private System.Windows.Forms.CheckBox ColorDataCheckBox;
+        private System.Windows.Forms.CheckBox BodyDataCheckBox;
+        private System.Windows.Forms.CheckBox PointCloudDataCheckBox;
         private System.Windows.Forms.NotifyIcon trayIcon;
         private System.Windows.Forms.ContextMenuStrip contextMenuStrip;
         private System.Windows.Forms.ToolStripMenuItem closeToolStripMenuItem;

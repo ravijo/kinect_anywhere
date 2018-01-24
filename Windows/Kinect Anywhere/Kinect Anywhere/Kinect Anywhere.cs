@@ -21,18 +21,28 @@ namespace Kinect_Anywhere
         /// </summary>
         private MultiSourceFrameReader multiFrameSourceReader;
 
-        private List<byte> pointCloudData = new List<byte>();
-        private List<byte> bodyFrameData = new List<byte>();
-
+        private int pointCloudSize = 0;
+        private byte[] pointCloudData;
         private byte[] colorFrameData;
 
+        private Body[] bodyArray;
+
+        private List<byte> bodyFrameData = new List<byte>();
+
         /// <summary>
-        /// Intermediate storage for the extended depth data received from the camera in the current frame
+        /// Intermediate storage for the depth data
         /// </summary>
         private IntPtr depthFrameData;
+
+        /// <summary>
+        /// Intermediate storage for the 3D camera points
+        /// </summary>
         private IntPtr camerSpacePoints;
+
+        /// <summary>
+        /// Intermediate storage for 2D color points
+        /// </summary>
         private IntPtr colorSpacePoints;
-        private Body[] bodyArray;
 
         /// <summary>
         /// Intermediate storage for the color data received from the camera in 32bit color
@@ -116,7 +126,71 @@ namespace Kinect_Anywhere
                 // Copy color data (using Bgra format)
                 colorFrame.CopyConvertedFrameDataToIntPtr(colorPixels, COLOR_PIXEL_BYTES, ColorImageFormat.Bgra);
 
-                ProcessFrames(ref depthFrame, ref bodyFrame);
+                if (ColorDataCheckBox.Checked)
+                {
+                    Marshal.Copy(colorPixels, colorFrameData, 8, (int)COLOR_PIXEL_BYTES);
+                    colorFramePublisher.Send(new ZFrame(colorFrameData));
+                }
+
+                if (BodyDataCheckBox.Checked)
+                {
+                    // Copy data for Body tracking
+                    bodyArray = new Body[bodyFrame.BodyCount];
+                    bodyFrame.GetAndRefreshBodyData(bodyArray);
+
+                    // Remove old bodies
+                    bodyFrameData.Clear();
+
+                    //At this point, we are just reserving 4 bytes for storing 'bodyCount' and we are going to modify it later
+                    AddArrayToList(ref bodyFrameData, new byte[4] { 0, 0, 0, 0 });
+
+                    int bodyCount = 0;
+                    foreach (Body body in bodyArray)
+                    {
+                        if (!body.IsTracked)
+                        {
+                            continue;
+                        }
+
+                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(body.TrackingId));//add 8 bytes for ulong TrackingId
+                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(ALL_JOINTS.Length));//add 4 bytes for int TrackingId
+
+                        foreach (JointType jointType in ALL_JOINTS)
+                        {
+                            var joint = body.Joints[jointType];
+                            AddArrayToList(ref bodyFrameData, BitConverter.GetBytes((int)joint.TrackingState));//add 4 bytes for int TrackingState
+                            AddArrayToList(ref bodyFrameData, BitConverter.GetBytes((int)joint.JointType));//add 4 bytes for int JointType
+                            AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.X));//add 4 bytes for float X
+                            AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.Y));//add 4 bytes for float Y
+                            AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.Z));//add 4 bytes for float Z
+                        }
+                        bodyCount++;
+                    }
+
+                    var bodyCountBytes = BitConverter.GetBytes(bodyCount);//4 bytes
+                    UpdateList(bodyCountBytes, ref bodyFrameData);
+
+                    bodyFramePublisher.Send(new ZFrame(bodyFrameData.ToArray()));
+                }
+
+                if (PointCloudDataCheckBox.Checked)
+                {
+                    depthFrame.CopyFrameDataToIntPtr(depthFrameData, DEPTH_FRAME_BYTES);
+                    coordinateMapper.MapDepthFrameToCameraSpaceUsingIntPtr(depthFrameData, DEPTH_FRAME_BYTES, camerSpacePoints, CAMERA_SPACE_BYTES);
+                    coordinateMapper.MapDepthFrameToColorSpaceUsingIntPtr(depthFrameData, DEPTH_FRAME_BYTES, colorSpacePoints, COLOR_SPACE_BYTES);
+
+                    // Remove old points
+                    ClearPointCloud();
+
+                    //At this point, we are just reserving 4 bytes for storing 'validPointsInCloud' and we are going to modify it later
+                    AddPointsToCloud(new byte[4] { 0, 0, 0, 0 });
+
+                    ComposePointCloud();
+
+                    GetNonEmptyPointCloud(out byte[] pointCloud);
+                    pointCloudPublisher.Send(new ZFrame(pointCloud));
+                }
+
             }
             finally
             {
@@ -137,113 +211,95 @@ namespace Kinect_Anywhere
             }
         }
 
-        unsafe public void ProcessFrames(ref DepthFrame depthFrame, ref BodyFrame bodyFrame)
+        private void ClearPointCloud()
         {
-            if (PointCloudData.Checked)
+            pointCloudSize = 0;
+        }
+
+        unsafe private void AddUintPointToCloud(uint point)
+        {
+            byte* bytePtr = (byte*)&point;
+
+            for (int i = 0; i < sizeof(uint); i++)
             {
-                depthFrame.CopyFrameDataToIntPtr(depthFrameData, DEPTH_FRAME_BYTES);
-                coordinateMapper.MapDepthFrameToCameraSpaceUsingIntPtr(depthFrameData, DEPTH_FRAME_BYTES, camerSpacePoints, CAMERA_SPACE_BYTES);
-                coordinateMapper.MapDepthFrameToColorSpaceUsingIntPtr(depthFrameData, DEPTH_FRAME_BYTES, colorSpacePoints, COLOR_SPACE_BYTES);
-
-                int validPointCount = 0;
-
-                // Remove old points
-                pointCloudData.Clear();
-
-                //At this point, we are just reserving 4 bytes for storing 'validPointCount' and we are going to modify it later
-                AddArrayToList(ref pointCloudData, new byte[4] { 0, 0, 0, 0 });
-
-                var colorSpacePoint = (ColorSpacePoint*)colorSpacePoints;
-                var camerSpacePoint = (CameraSpacePoint*)camerSpacePoints;
-                var colorPixel = (byte*)colorPixels;
-
-                for (var index = 0; index < DEPTH_FRAME_LENGTH; index++)
-                {
-                    int colorX = (int)Math.Floor(colorSpacePoint[index].X);
-                    int colorY = (int)Math.Floor(colorSpacePoint[index].Y);
-
-                    // Not every depth colorPixel has a corresponding color colorPixel.
-                    // So always check whether colorX, colorY are valid or not
-                    if (colorX < 0 || colorX >= COLOR_FRAME_WIDTH || colorY < 0 || colorY >= COLOR_FRAME_HEIGHT)
-                    {
-                        continue;
-                    }
-
-                    // Now colorX, colorY are colorPixel coordinates in colorspace,
-                    // so to get the index of the corresponding colorPixel,
-                    // we need to multiply colorY by COLOR_FRAME_WIDTH
-                    int pixelsBaseIndex = (colorY * COLOR_FRAME_WIDTH + colorX) * COLOR_BYTES_PER_PIXEL;
-
-                    byte blue = colorPixel[pixelsBaseIndex];
-                    byte green = colorPixel[pixelsBaseIndex + 1];
-                    byte red = colorPixel[pixelsBaseIndex + 2];
-                    byte alpha = colorPixel[pixelsBaseIndex + 3];
-
-                    AddArrayToList(ref pointCloudData, BitConverter.GetBytes(camerSpacePoint[index].X)); //add 4 bytes for float x
-                    AddArrayToList(ref pointCloudData, BitConverter.GetBytes(camerSpacePoint[index].Y)); //add 4 bytes for float y
-                    AddArrayToList(ref pointCloudData, BitConverter.GetBytes(camerSpacePoint[index].Z)); //add 4 bytes for float z
-
-                    uint bgra = (uint)((blue << 24) | (green << 16) | (red << 8) | alpha);
-                    AddArrayToList(ref pointCloudData, BitConverter.GetBytes(bgra)); //add 4 bytes for unsigned int
-
-                    //Added 16 bytes in one iteration
-                    validPointCount++;
-                }
-
-                var validPointBytes = BitConverter.GetBytes(validPointCount);//4 bytes
-                UpdateList(validPointBytes, ref pointCloudData);
-
-                pointCloudPublisher.Send(new ZFrame(pointCloudData.ToArray()));
-            }
-
-            if (ColorData.Checked)
-            {
-                Marshal.Copy(colorPixels, colorFrameData, 8, (int)COLOR_PIXEL_BYTES);
-                colorFramePublisher.Send(new ZFrame(colorFrameData));
-            }
-
-            if (BodyData.Checked)
-            {
-                // Copy data for Body tracking
-                bodyArray = new Body[bodyFrame.BodyCount];
-                bodyFrame.GetAndRefreshBodyData(bodyArray);
-
-                // Remove old bodies
-                bodyFrameData.Clear();
-
-                //At this point, we are just reserving 4 bytes for storing 'bodyCount' and we are going to modify it later
-                AddArrayToList(ref bodyFrameData, new byte[4] { 0, 0, 0, 0 });
-
-                int bodyCount = 0;
-                foreach (Body body in bodyArray)
-                {
-                    if (!body.IsTracked)
-                    {
-                        continue;
-                    }
-
-                    AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(body.TrackingId));//add 8 bytes for ulong TrackingId
-                    AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(ALL_JOINTS.Length));//add 4 bytes for int TrackingId
-
-                    foreach (JointType jointType in ALL_JOINTS)
-                    {
-                        var joint = body.Joints[jointType];
-                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes((int)joint.TrackingState));//add 4 bytes for int TrackingState
-                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes((int)joint.JointType));//add 4 bytes for int JointType
-                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.X));//add 4 bytes for float X
-                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.Y));//add 4 bytes for float Y
-                        AddArrayToList(ref bodyFrameData, BitConverter.GetBytes(joint.Position.Z));//add 4 bytes for float Z
-                    }
-                    bodyCount++;
-                }
-
-                var bodyCountBytes = BitConverter.GetBytes(bodyCount);//4 bytes
-                UpdateList(bodyCountBytes, ref bodyFrameData);
-
-                bodyFramePublisher.Send(new ZFrame(bodyFrameData.ToArray()));
+                pointCloudData[pointCloudSize] = bytePtr[i];
+                pointCloudSize++;
             }
         }
 
+        unsafe private void AddFloatPointToCloud(float point)
+        {
+            byte* bytePtr = (byte*)&point;
+
+            for (int i = 0; i < sizeof(float); i++)
+            {
+                pointCloudData[pointCloudSize] = bytePtr[i];
+                pointCloudSize++;
+            }
+        }
+
+        private void AddPointsToCloud(byte[] points)
+        {
+            for (int i = 0; i < points.Length; i++)
+            {
+                pointCloudData[pointCloudSize] = points[i];
+                pointCloudSize++;
+            }
+        }
+
+        private void GetNonEmptyPointCloud(out byte[] pointCloud)
+        {
+            int validPointCount = (pointCloudSize - sizeof(int)) / (4 * sizeof(int));
+            byte[] validPointCountBytes = BitConverter.GetBytes(validPointCount);
+
+            pointCloud = new byte[pointCloudSize];
+            Array.Copy(pointCloudData, 0, pointCloud, 0, pointCloudSize);
+
+            for (int i = 0; i < validPointCountBytes.Length; i++)
+            {
+                pointCloud[i] = validPointCountBytes[i];
+            }
+        }
+
+        unsafe private void ComposePointCloud()
+        {
+            var colorSpacePoint = (ColorSpacePoint*)colorSpacePoints;
+            var camerSpacePoint = (CameraSpacePoint*)camerSpacePoints;
+            var colorPixel = (byte*)colorPixels;
+
+            for (var index = 0; index < DEPTH_FRAME_LENGTH; index++)
+            {
+                int colorX = (int)Math.Floor(colorSpacePoint[index].X);
+                int colorY = (int)Math.Floor(colorSpacePoint[index].Y);
+
+                // Not every depth colorPixel has a corresponding color colorPixel.
+                // So always check whether colorX, colorY are valid or not
+                if (colorX < 0 || colorX >= COLOR_FRAME_WIDTH || colorY < 0 || colorY >= COLOR_FRAME_HEIGHT)
+                {
+                    continue;
+                }
+
+                // Now colorX, colorY are colorPixel coordinates in colorspace,
+                // so to get the index of the corresponding colorPixel,
+                // we need to multiply colorY by COLOR_FRAME_WIDTH
+                int pixelsBaseIndex = (colorY * COLOR_FRAME_WIDTH + colorX) * COLOR_BYTES_PER_PIXEL;
+
+                byte blue = colorPixel[pixelsBaseIndex];
+                byte green = colorPixel[pixelsBaseIndex + 1];
+                byte red = colorPixel[pixelsBaseIndex + 2];
+                byte alpha = colorPixel[pixelsBaseIndex + 3];
+
+                AddFloatPointToCloud(camerSpacePoint[index].X); //add 4 bytes for float x
+                AddFloatPointToCloud(camerSpacePoint[index].Y); //add 4 bytes for float y
+                AddFloatPointToCloud(camerSpacePoint[index].Z); //add 4 bytes for float z
+
+                uint bgra = (uint)((blue << 24) | (green << 16) | (red << 8) | alpha);
+                AddUintPointToCloud(bgra); //add 4 bytes for unsigned int
+
+                //Added 16 bytes in one iteration
+            }
+        }
+        byte[] nnn = new byte[4] { 1, 2, 3, 4 };
         private void AddArrayToList(ref List<byte> destination, byte[] source)
         {
             for (int i = 0; i < source.Length; i++)
@@ -267,19 +323,19 @@ namespace Kinect_Anywhere
 
         private void SetupPublishers()
         {
-            if (ColorData.Checked)
+            if (ColorDataCheckBox.Checked)
             {
                 colorFramePublisher.SetOption(ZSocketOption.CONFLATE, 1);
                 colorFramePublisher.Bind("tcp://*:10000");
             }
 
-            if (BodyData.Checked)
+            if (BodyDataCheckBox.Checked)
             {
                 bodyFramePublisher.SetOption(ZSocketOption.CONFLATE, 1);
                 bodyFramePublisher.Bind("tcp://*:10001");
             }
 
-            if (PointCloudData.Checked)
+            if (PointCloudDataCheckBox.Checked)
             {
                 pointCloudPublisher.SetOption(ZSocketOption.CONFLATE, 1);
                 pointCloudPublisher.Bind("tcp://*:10002");
@@ -288,13 +344,13 @@ namespace Kinect_Anywhere
 
         private void StartButton_Click(object sender, EventArgs e)
         {
-            if (!ColorData.Checked && !BodyData.Checked && !PointCloudData.Checked)
+            if (!ColorDataCheckBox.Checked && !BodyDataCheckBox.Checked && !PointCloudDataCheckBox.Checked)
             {
                 MessageBox.Show("Please select alteast one data.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             else
             {
-                ConfigurationManager.SaveConfiguration(ColorData.Checked, BodyData.Checked, PointCloudData.Checked);
+                ConfigurationManager.SaveConfiguration(ColorDataCheckBox.Checked, BodyDataCheckBox.Checked, PointCloudDataCheckBox.Checked);
 
                 kinectSensor = KinectSensor.GetDefault();
 
@@ -330,6 +386,8 @@ namespace Kinect_Anywhere
                 COLOR_PIXEL_BYTES = (uint)(COLOR_FRAME_WIDTH * COLOR_FRAME_HEIGHT * COLOR_BYTES_PER_PIXEL);
                 colorPixels = Marshal.AllocHGlobal((int)COLOR_PIXEL_BYTES);
 
+                pointCloudData = new byte[4 * sizeof(int) * DEPTH_FRAME_LENGTH]; //XYZBGRA
+
                 colorFrameData = new byte[(2 * sizeof(int)) + COLOR_PIXEL_BYTES];
 
                 var widthBytes = BitConverter.GetBytes(COLOR_FRAME_WIDTH); // 4 bytes
@@ -346,29 +404,29 @@ namespace Kinect_Anywhere
         {
             var configuration = ConfigurationManager.GetConfiguration();
 
-            ColorData.Checked = configuration[ConfigurationManager.COLOR_KEY];
-            ColorData.Text = Convert.ToString(ColorData.Checked);
+            ColorDataCheckBox.Checked = configuration[ConfigurationManager.COLOR_KEY];
+            ColorDataCheckBox.Text = Convert.ToString(ColorDataCheckBox.Checked);
 
-            BodyData.Checked = configuration[ConfigurationManager.BODY_KEY];
-            BodyData.Text = Convert.ToString(BodyData.Checked);
+            BodyDataCheckBox.Checked = configuration[ConfigurationManager.BODY_KEY];
+            BodyDataCheckBox.Text = Convert.ToString(BodyDataCheckBox.Checked);
 
-            PointCloudData.Checked = configuration[ConfigurationManager.POINT_CLOUD_KEY];
-            PointCloudData.Text = Convert.ToString(PointCloudData.Checked);
+            PointCloudDataCheckBox.Checked = configuration[ConfigurationManager.POINT_CLOUD_KEY];
+            PointCloudDataCheckBox.Text = Convert.ToString(PointCloudDataCheckBox.Checked);
         }
 
         private void ColorData_CheckedChanged(object sender, EventArgs e)
         {
-            ColorData.Text = Convert.ToString(ColorData.Checked);
+            ColorDataCheckBox.Text = Convert.ToString(ColorDataCheckBox.Checked);
         }
 
         private void BodyData_CheckedChanged(object sender, EventArgs e)
         {
-            BodyData.Text = Convert.ToString(BodyData.Checked);
+            BodyDataCheckBox.Text = Convert.ToString(BodyDataCheckBox.Checked);
         }
 
         private void PointCloudData_CheckedChanged(object sender, EventArgs e)
         {
-            PointCloudData.Text = Convert.ToString(PointCloudData.Checked);
+            PointCloudDataCheckBox.Text = Convert.ToString(PointCloudDataCheckBox.Checked);
         }
 
         private void KinectAnywhereForm_FormClosing(object sender, FormClosingEventArgs e)
@@ -383,6 +441,7 @@ namespace Kinect_Anywhere
             DisposeSocket(colorFramePublisher);
             DisposeSocket(bodyFramePublisher);
 
+            DisposeIntPtr(colorPixels);
             DisposeIntPtr(depthFrameData);
             DisposeIntPtr(camerSpacePoints);
             DisposeIntPtr(colorSpacePoints);
