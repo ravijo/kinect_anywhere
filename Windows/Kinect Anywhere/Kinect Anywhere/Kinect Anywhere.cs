@@ -1,4 +1,4 @@
-﻿using Microsoft.Kinect;
+using Microsoft.Kinect;
 using System;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -182,7 +182,7 @@ namespace Kinect_Anywhere
                     // Remove old points
                     ClearPointCloud();
 
-                    //At this point, we are just reserving 4 bytes for storing 'validPointsInCloud' and we are going to modify it later
+                    //At this point, we are just reserving 4 bytes for storing 'pointCloudSize' and we are going to modify it later
                     AddPointsToCloud(new byte[4] { 0, 0, 0, 0 });
 
                     ComposePointCloud();
@@ -222,8 +222,7 @@ namespace Kinect_Anywhere
 
             for (int i = 0; i < sizeof(uint); i++)
             {
-                pointCloudData[pointCloudSize] = bytePtr[i];
-                pointCloudSize++;
+                pointCloudData[pointCloudSize++] = bytePtr[i];
             }
         }
 
@@ -233,8 +232,7 @@ namespace Kinect_Anywhere
 
             for (int i = 0; i < sizeof(float); i++)
             {
-                pointCloudData[pointCloudSize] = bytePtr[i];
-                pointCloudSize++;
+                pointCloudData[pointCloudSize++] = bytePtr[i];
             }
         }
 
@@ -242,8 +240,7 @@ namespace Kinect_Anywhere
         {
             for (int i = 0; i < points.Length; i++)
             {
-                pointCloudData[pointCloudSize] = points[i];
-                pointCloudSize++;
+                pointCloudData[pointCloudSize++] = points[i];
             }
         }
 
@@ -299,7 +296,7 @@ namespace Kinect_Anywhere
                 //Added 16 bytes in one iteration
             }
         }
-        byte[] nnn = new byte[4] { 1, 2, 3, 4 };
+
         private void AddArrayToList(ref List<byte> destination, byte[] source)
         {
             for (int i = 0; i < source.Length; i++)
