@@ -8,7 +8,7 @@
 #include <zmq.hpp>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
-
+#include <pcl_conversions/pcl_conversions.h>
 //#include <chrono>
 
 typedef pcl::PointXYZRGBA Point;
@@ -88,9 +88,8 @@ int main(int argc, char** argv)
             point_cloud_ros->width = point_count;
             point_cloud_ros->height = 1;
 
-            // see sec. 3.1 'Publishing point clouds' in
-            // http://wiki.ros.org/pcl_ros#ROS_C.2B-.2B-_interface
-            point_cloud_ros->header.stamp = ros::Time::now().toNSec();
+            // https://answers.ros.org/question/172730/pcl-header-timestamp/
+            pcl_conversions::toPCL(ros::Time::now(), point_cloud_ros->header.stamp);
 
             for (int i = 0; i < point_count; i++)
             {
