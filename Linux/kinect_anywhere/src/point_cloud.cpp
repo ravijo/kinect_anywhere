@@ -8,7 +8,7 @@
 #include <zmq.hpp>
 #include <pcl/point_types.h>
 #include <pcl_ros/point_cloud.h>
-
+#include <pcl_conversions/pcl_conversions.h>
 //#include <chrono>
 
 typedef pcl::PointXYZRGBA Point;
@@ -51,6 +51,18 @@ int main(int argc, char** argv)
     int conflate = 1;
     zmq_socket.setsockopt(ZMQ_CONFLATE, &conflate, sizeof(conflate));
 
+    int tcp_keepalive = 1;
+    zmq_socket.setsockopt(ZMQ_TCP_KEEPALIVE, &tcp_keepalive, sizeof(tcp_keepalive));
+
+    int tcp_keepalive_idle = 30;
+    zmq_socket.setsockopt(ZMQ_TCP_KEEPALIVE_IDLE, &tcp_keepalive_idle, sizeof(tcp_keepalive_idle));
+
+    int tcp_keepalive_intvl = 5;
+    zmq_socket.setsockopt(ZMQ_TCP_KEEPALIVE_INTVL, &tcp_keepalive_intvl, sizeof(tcp_keepalive_intvl));
+
+    int tcp_keepalive_cnt = 6;
+    zmq_socket.setsockopt(ZMQ_TCP_KEEPALIVE_CNT, &tcp_keepalive_cnt, sizeof(tcp_keepalive_cnt));
+
     std::string socket_address = "tcp://" + host + ":10002";
     zmq_socket.connect(socket_address.c_str());
 
@@ -59,11 +71,20 @@ int main(int argc, char** argv)
     point_cloud_ros->height = 1;
     point_cloud_ros->header.frame_id = frame_id;
 
+    ros::Duration duration(0.1); // in seconds (100 ms)
     while (ros::ok())
     {
         // std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
         zmq::message_t msg;
-        int rc = zmq_socket.recv(&msg);
+        int rc = 0;
+        try
+        {
+          rc = zmq_socket.recv(&msg);
+        }
+        catch(zmq::error_t& e)
+        {
+          ROS_DEBUG_STREAM("ZMQ Error. " << e.what());
+        }
         // std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
         // std::cout << "time (ms): " << std::chrono::duration_cast<std::chrono::microseconds>(t2 -
         // t1).count()/1000.0 << std::endl;
@@ -88,9 +109,8 @@ int main(int argc, char** argv)
             point_cloud_ros->width = point_count;
             point_cloud_ros->height = 1;
 
-            // see sec. 3.1 'Publishing point clouds' in
-            // http://wiki.ros.org/pcl_ros#ROS_C.2B-.2B-_interface
-            point_cloud_ros->header.stamp = ros::Time::now().toNSec();
+            // https://answers.ros.org/question/172730/pcl-header-timestamp/
+            pcl_conversions::toPCL(ros::Time::now(), point_cloud_ros->header.stamp);
 
             for (int i = 0; i < point_count; i++)
             {
@@ -123,6 +143,11 @@ int main(int argc, char** argv)
             }
             pub.publish(point_cloud_ros);
             ros::spinOnce();
+        }
+        else
+        {
+          ROS_DEBUG_STREAM("Pointcloud recv() returned 0");
+          duration.sleep();
         }
     }
 

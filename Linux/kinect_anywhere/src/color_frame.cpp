@@ -71,13 +71,34 @@ int main(int argc, char** argv)
     int conflate = 1;
     zmq_socket.setsockopt(ZMQ_CONFLATE, &conflate, sizeof(conflate));
 
+    int tcp_keepalive = 1;
+    zmq_socket.setsockopt(ZMQ_TCP_KEEPALIVE, &tcp_keepalive, sizeof(tcp_keepalive));
+
+    int tcp_keepalive_idle = 30;
+    zmq_socket.setsockopt(ZMQ_TCP_KEEPALIVE_IDLE, &tcp_keepalive_idle, sizeof(tcp_keepalive_idle));
+
+    int tcp_keepalive_intvl = 5;
+    zmq_socket.setsockopt(ZMQ_TCP_KEEPALIVE_INTVL, &tcp_keepalive_intvl, sizeof(tcp_keepalive_intvl));
+
+    int tcp_keepalive_cnt = 6;
+    zmq_socket.setsockopt(ZMQ_TCP_KEEPALIVE_CNT, &tcp_keepalive_cnt, sizeof(tcp_keepalive_cnt));
+
     std::string socket_address = "tcp://" + host + ":10000";
     zmq_socket.connect(socket_address.c_str());
 
+    ros::Duration duration(0.1); // in seconds (100 ms)
     while (ros::ok())
     {
         zmq::message_t msg;
-        int rc = zmq_socket.recv(&msg);
+        int rc = 0;
+        try
+        {
+          rc = zmq_socket.recv(&msg);
+        }
+        catch(zmq::error_t& e)
+        {
+          ROS_DEBUG_STREAM("ZMQ Error. " << e.what());
+        }
         if (rc)
         {
             unsigned char* byte_ptr = static_cast<unsigned char*>(msg.data());
@@ -109,6 +130,11 @@ int main(int argc, char** argv)
 
             camera_publisher.publish(ros_image, camera_info, ros::Time(timestamp));
             ros::spinOnce();
+        }
+        else
+        {
+          ROS_DEBUG_STREAM("Color recv() returned 0");
+          duration.sleep();
         }
     }
 
