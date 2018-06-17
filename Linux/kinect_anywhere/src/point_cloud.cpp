@@ -112,6 +112,8 @@ int main(int argc, char** argv)
             // https://answers.ros.org/question/172730/pcl-header-timestamp/
             pcl_conversions::toPCL(ros::Time::now(), point_cloud_ros->header.stamp);
 
+            // Todo: use sensor_msgs::PointCloud2 instead of pcl::PointCloud<pcl::PointXYZRBGA>
+            // http://docs.ros.org/kinetic/api/sensor_msgs/html/msg/PointCloud2.html
             for (int i = 0; i < point_count; i++)
             {
                 float x;
