@@ -38,8 +38,9 @@ This is a ROS Package which gets the data from Windows application. The Linux PC
      
      Below is an example of using `kinect_anywhere.launch` file:
      
-     `roslaunch kinect_anywhere kinect_anywhere.launch  color:=true body:=true pointcloud:=true kinect_frame:=base`
+     `roslaunch kinect_anywhere kinect_anywhere.launch  color:=true body:=true pointcloud:=true kinect_frame:=base host:=192.168.abc.xyz`
 
+In order to save the value of `host` parameter parmanently, edit [kinect_anywhere.launch](Linux/kinect_anywhere/launch/kinect_anywhere.launch#L12) file
 
 ## Note
 1. The Windows application is tested on 64Bit Windows 10, 8GB RAM, Intel Core i5-6200U 2.30GHz 2.40GHz CPU.
