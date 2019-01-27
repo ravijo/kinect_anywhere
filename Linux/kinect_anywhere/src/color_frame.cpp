@@ -87,9 +87,9 @@ int main(int argc, char** argv)
     zmq_socket.connect(socket_address.c_str());
 
     ros::Duration duration(0.1); // in seconds (100 ms)
+    zmq::message_t msg;
     while (ros::ok())
     {
-        zmq::message_t msg;
         int rc = 0;
         try
         {
