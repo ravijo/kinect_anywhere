@@ -72,10 +72,10 @@ int main(int argc, char** argv)
     point_cloud_ros->header.frame_id = frame_id;
 
     ros::Duration duration(0.1); // in seconds (100 ms)
+    zmq::message_t msg;
     while (ros::ok())
     {
         // std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-        zmq::message_t msg;
         int rc = 0;
         try
         {
@@ -108,6 +108,7 @@ int main(int argc, char** argv)
             point_cloud_ros->clear(); // Remove old points from cloud
             point_cloud_ros->width = point_count;
             point_cloud_ros->height = 1;
+            point_cloud_ros->reserve(point_count);
 
             // https://answers.ros.org/question/172730/pcl-header-timestamp/
             pcl_conversions::toPCL(ros::Time::now(), point_cloud_ros->header.stamp);
@@ -141,7 +142,7 @@ int main(int argc, char** argv)
                 point_ros.r = (bgra >> 8);
                 point_ros.a = bgra;
 
-                point_cloud_ros->push_back(point_ros);
+                point_cloud_ros->emplace_back(point_ros);
             }
             pub.publish(point_cloud_ros);
             ros::spinOnce();
