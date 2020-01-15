@@ -48,3 +48,6 @@ In order to save the value of `host` parameter parmanently, edit [kinect_anywher
 1. The body tracking data can be visualized inside [Rviz](http://wiki.ros.org/rviz) by using [rviz_skeleton_visualization](https://github.com/ravijo/rviz_skeleton_visualization) package.
 1. One of the major concerns while developing this tool was to receive the high quality of point cloud data in real-time. Hence, here in the development environment, Ethernet wire (CAT 6) in 1 Gbps LAN connection was used. The average data transfer speed (Color, Point Cloud, and Body Data are selected) was 800 Mbps approximately.
 ![Resource Consumption](docs/Resource-Consumption.PNG)
+
+## Issues (or Error Reporting)
+Please check [here](https://github.com/ravijo/kinect_anywhere/issues) and create issues accordingly.
